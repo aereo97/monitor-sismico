@@ -2,111 +2,153 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#d9534f">
-    
-    <title>Sismos Zinzi - Anti-Congelamiento</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Sísmico - Venezuela y Global</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f9f9f9; color: #333; margin: 0; }
-        h1 { color: #d9534f; margin-top: 20px; font-size: 28px; }
-        .autor { font-size: 14px; color: #777; margin-top: -10px; margin-bottom: 20px; font-style: italic; }
-        .caja-sismo { background-color: white; border: 2px solid #ccc; padding: 20px; border-radius: 15px; margin-top: 20px; box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
-        .magnitud { font-size: 45px; font-weight: bold; color: #d9534f; margin: 15px 0; }
-        .lugar { font-size: 20px; font-weight: bold; }
-        .fecha { color: #666; font-size: 16px; margin-top: 10px; }
-        .seguro { background-color: #dff0d8; border-color: #3c763d; color: #3c763d; }
-        .caja-error { background-color: #f8d7da; border: 2px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 15px; margin-top: 20px; text-align: left; word-break: break-all; font-size: 14px; }
-        button { margin-top: 30px; padding: 20px 30px; font-size: 20px; background-color: #0275d8; color: white; border: none; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}
-        button:active { background-color: #025aa5; transform: scale(0.98); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #ffffff; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #ff6b6b; font-size: 1.8em; }
+        
+        /* Estilos del panel indicador de fuentes */
+        .status-bar { text-align: center; background: #2b2b36; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; border: 1px solid #444; }
+        .status-badge { padding: 6px 12px; border-radius: 20px; margin: 5px; font-size: 0.9em; display: inline-block; }
+        .active { background-color: #2e7d32; color: white; } /* Verde para conectado */
+        .error { background-color: #c62828; color: white; } /* Rojo para error */
+        .loading { background-color: #f57c00; color: white; } /* Naranja para cargando */
+        
+        /* Estilos de la lista de sismos */
+        .container { max-width: 800px; margin: auto; background: #2a2a35; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .sismo { border-bottom: 1px solid #444; padding: 15px 0; display: flex; justify-content: space-between; align-items: center; }
+        .sismo:last-child { border-bottom: none; }
+        
+        .mag { font-size: 1.4em; font-weight: bold; color: white; padding: 10px; border-radius: 50%; min-width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; }
+        .mag.low { background-color: #4caf50; } /* Magnitud baja */
+        .mag.med { background-color: #ff9800; } /* Magnitud media */
+        .mag.high { background-color: #f44336; } /* Magnitud alta */
+        
+        .details { flex-grow: 1; margin-left: 15px; }
+        .details strong { font-size: 1.1em; }
+        .details small { color: #aaa; }
+        
+        .source { font-size: 0.85em; padding: 4px 8px; border-radius: 5px; color: white; font-weight: bold; }
+        .source.usgs { background-color: #1976d2; } /* Azul para USGS */
+        .source.funvisis { background-color: #d84315; } /* Naranja/Rojo para Funvisis */
     </style>
 </head>
 <body>
 
-    <h1>🌎 Monitor Sísmico</h1>
-    <div class="autor">Desarrollado por Carlos Zinzi</div>
-    <p>Información oficial en tiempo real (USGS)</p>
-
-    <div id="resultado">
-        <p>Buscando datos... ⏳</p>
+<div class="container">
+    <h1>🌍 Monitor Sísmico en Tiempo Real</h1>
+    
+    <div class="status-bar">
+        <div style="margin-bottom: 10px;">📡 Conexión de Datos en vivo:</div>
+        <span id="status-usgs" class="status-badge loading">USGS (Global) ⏳ Conectando...</span>
+        <span id="status-funvisis" class="status-badge loading">FUNVISIS (Venezuela) ⏳ Conectando...</span>
     </div>
 
-    <button onclick="buscarSismos()">🔄 Actualizar ahora</button>
+    <div id="sismos-list">
+        <p style="text-align:center; color: #aaa;">Sincronizando con los servidores sismológicos...</p>
+    </div>
+</div>
 
-    <script>
-        async function buscarSismos() {
-            document.getElementById('resultado').innerHTML = "<p>Buscando datos... ⏳</p>";
+<script>
+    // 1. Función para extraer datos del USGS (Servicio Geológico de EE.UU.)
+    async function fetchUSGS() {
+        try {
+            // Buscamos sismos de todos los tamaños del último día
+            const response = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson');
+            const data = await response.json();
             
-            // Creamos un controlador para abortar si tarda mucho (5 segundos)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            // Actualizamos la pantalla indicando conexión exitosa
+            document.getElementById('status-usgs').className = 'status-badge active';
+            document.getElementById('status-usgs').innerHTML = 'USGS (Global) ✅';
+            
+            return data.features.map(q => ({
+                source: 'USGS',
+                mag: q.properties.mag,
+                place: q.properties.place,
+                time: new Date(q.properties.time)
+            }));
+        } catch (e) {
+            document.getElementById('status-usgs').className = 'status-badge error';
+            document.getElementById('status-usgs').innerHTML = 'USGS (Sin conexión) ❌';
+            return [];
+        }
+    }
 
-            try {
-                const respuesta = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson', {
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId); // Limpiamos el temporizador si responde rápido
+    // 2. Función para extraer datos de FUNVISIS
+    async function fetchFunvisis() {
+        try {
+            // Usamos una API puente pública configurada para monitorear Funvisis en Venezuela
+            const response = await fetch('https://sismosve.rafnixg.dev/api/v1/sismos');
+            if (!response.ok) throw new Error("Sin respuesta del servidor");
+            const data = await response.json();
+            
+            // Actualizamos la pantalla indicando conexión exitosa
+            document.getElementById('status-funvisis').className = 'status-badge active';
+            document.getElementById('status-funvisis').innerHTML = 'FUNVISIS (Venezuela) ✅';
 
-                if (!respuesta.ok) {
-                    throw new Error(`HTTP Error: ${respuesta.status}`);
-                }
-                
-                const datos = await respuesta.json();
-                let sismos = datos.features;
-                let sismoVenezuela = null;
+            // Mapeamos los datos para unificarlos con el mismo formato
+            return data.map(q => ({
+                source: 'FUNVISIS',
+                mag: parseFloat(q.magnitud),
+                place: (q.epicentro || q.localizacion || 'Sismo en Venezuela') + " - Prof: " + (q.profundidad || 'N/A'),
+                time: new Date(q.fecha + 'T' + q.hora)
+            }));
+        } catch (e) {
+            console.warn("Aviso: No se pudieron obtener datos exclusivos de Funvisis en este instante.");
+            document.getElementById('status-funvisis').className = 'status-badge error';
+            document.getElementById('status-funvisis').innerHTML = 'FUNVISIS (Aviso) ⚠️';
+            return [];
+        }
+    }
 
-                for(let i = 0; i < sismos.length; i++) {
-                    if(sismos[i].properties.place.includes("Venezuela")) {
-                        sismoVenezuela = sismos[i];
-                        break;
-                    }
-                }
+    // 3. Función principal que une ambos sistemas
+    async function init() {
+        const list = document.getElementById('sismos-list');
+        
+        // Ejecutamos ambas recolecciones al mismo tiempo
+        const [usgsData, funvisisData] = await Promise.all([fetchUSGS(), fetchFunvisis()]);
+        
+        // Juntamos todos los sismos en una sola lista
+        let sismos = [...usgsData, ...funvisisData];
 
-                let caja = document.getElementById('resultado');
-
-                if (sismoVenezuela) {
-                    let mag = sismoVenezuela.properties.mag;
-                    let lugar = sismoVenezuela.properties.place;
-                    let fecha = new Date(sismoVenezuela.properties.time).toLocaleString();
-
-                    caja.innerHTML = `
-                        <div class="caja-sismo">
-                            <p>⚠️ <strong>ÚLTIMO SISMO DETECTADO</strong> ⚠️</p>
-                            <div class="magnitud">Mag: ${mag}</div>
-                            <div class="lugar">${lugar}</div>
-                            <div class="fecha">Hora: ${fecha}</div>
-                        </div>
-                    `;
-                } else {
-                    caja.innerHTML = `
-                        <div class="caja-sismo seguro">
-                            <p>✅ <strong>TODO TRANQUILO</strong> ✅</p>
-                            <p>Sin sismos fuertes en las últimas 24 horas.</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                // Si pasaron 5 segundos o hay un error de red, cae aquí
-                let mensajeError = error.message;
-                if (error.name === 'AbortError') {
-                    mensajeError = "La conexión tardó demasiado (Timeout). El navegador está bloqueando la petición silenciosamente.";
-                }
-
-                document.getElementById('resultado').innerHTML = `
-                    <div class="caja-error">
-                        <p><strong>❌ FALLA DE CONEXIÓN:</strong></p>
-                        <p>${mensajeError}</p>
-                        <hr>
-                        <p><em>Nota: Si estás en un iPhone, desactiva temporalmente el "Relay Privado" de iCloud o las extensiones de Safari para probar.</em></p>
-                    </div>
-                `;
-            }
+        list.innerHTML = '';
+        if (sismos.length === 0) {
+            list.innerHTML = '<p style="text-align:center;">No se encontraron sismos o hay problemas de red.</p>';
+            return;
         }
 
-        buscarSismos();
-    </script>
+        // Ordenamos los sismos para que salgan los más recientes de primer lugar
+        sismos.sort((a, b) => b.time - a.time);
+
+        // Mostramos en pantalla (limitamos a 50 para que cargue rápido)
+        sismos.slice(0, 50).forEach(sismo => {
+            const div = document.createElement('div');
+            div.className = 'sismo';
+            
+            // Definimos el color del círculo según la magnitud
+            let magVal = sismo.mag ? sismo.mag.toFixed(1) : '?';
+            let colorClass = 'low';
+            if (sismo.mag >= 4.0 && sismo.mag < 6.0) colorClass = 'med';
+            if (sismo.mag >= 6.0) colorClass = 'high';
+
+            // Etiqueta del servicio
+            let sourceClass = sismo.source === 'USGS' ? 'usgs' : 'funvisis';
+
+            div.innerHTML = `
+                <div class="mag ${colorClass}">${magVal}</div>
+                <div class="details">
+                    <strong>${sismo.place}</strong><br>
+                    <small>${sismo.time.toLocaleString()}</small>
+                </div>
+                <div class="source ${sourceClass}">${sismo.source}</div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    // Iniciar el proceso cuando termine de cargar la pantalla
+    window.onload = init;
+</script>
 </body>
 </html>
