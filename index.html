@@ -35,7 +35,7 @@
     <button id="btn-json" class="btn-json" style="display:none;" onclick="descargarJSON()">⬇️ Descargar Historial Completo (.JSON)</button>
 
     <div id="sismos-list">
-        <p style="text-align:center;">Presiona el botón rojo para comenzar a escanear.</p>
+        <p style="text-align:center;">Presiona el botón verde para cargar el historial de sismos.</p>
     </div>
 
     <h3 style="margin-top: 30px;">📱 ¿Cómo instalar esta App?</h3>
@@ -45,7 +45,7 @@
     </div>
     <div class="acordeon">
         <div class="cabecera" onclick="toggle(this)"><span class="icono">🤖</span> Android (Chrome)</div>
-        <div class="contenido">1. Toca los tres puntos.<br>2. Selecciona "Instalar aplicación" o "Añadir a inicio".<br>3. Confirma en "Instalar".</div>
+        <div class="contenido">1. Toca los tres puntos.<br>2. Selecciona "Instalar aplicación".<br>3. Confirma en "Instalar".</div>
     </div>
 </div>
 
@@ -58,7 +58,6 @@
     function toggle(el) { el.nextElementSibling.style.display = el.nextElementSibling.style.display === 'block' ? 'none' : 'block'; }
 
     async function chequearSismos() {
-        if (!monitoreoActivo) return;
         try {
             const [uRes, fRes] = await Promise.all([
                 fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson'),
@@ -83,7 +82,8 @@
             
             const reciente = datosHistoricos[0];
 
-            if (ultimoSismoTime !== 0 && reciente.time > ultimoSismoTime) {
+            // Si es un evento nuevo comparado al que ya teníamos registrado, alerta
+            if (monitoreoActivo && ultimoSismoTime !== 0 && reciente.time > ultimoSismoTime) {
                 document.body.classList.add('alerta-roja');
                 setTimeout(() => document.body.classList.remove('alerta-roja'), 5000);
                 if (audioCtx) {
@@ -107,12 +107,10 @@
 
     function descargarJSON() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(datosHistoricos, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "historial_sismos_venezuela.json");
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
+        const a = document.createElement('a');
+        a.href = dataStr;
+        a.download = "historial_sismos_venezuela.json";
+        a.click();
     }
 
     function activarSistema() {
@@ -121,9 +119,9 @@
             monitoreoActivo = true;
             document.getElementById('btn-activar').innerHTML = "✅ MONITOREO ACTIVO";
             document.getElementById('btn-activar').classList.add('on');
-            chequearSismos();
-            setInterval(chequearSismos, 60000);
         }
+        chequearSismos(); // Carga inmediata
+        setInterval(chequearSismos, 60000); // Luego cada minuto
     }
 </script>
 </body>
