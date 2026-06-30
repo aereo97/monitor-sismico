@@ -124,18 +124,33 @@
 
     async function fetchFunvisis() {
         try {
-            const response = await fetch('https://sismosve.rafnixg.dev/api/v1/sismos');
+            // Usamos un proxy para saltar la restricción de seguridad del navegador
+            const proxyUrl = 'https://corsproxy.io/?';
+            const targetUrl = 'https://sismosve.rafnixg.dev/api/v1/sismos';
+            
+            const response = await fetch(proxyUrl + encodeURIComponent(targetUrl));
+            
+            if (!response.ok) throw new Error('Error en conexión');
+            
             const data = await response.json();
+            
             document.getElementById('status-funvisis').className = 'status-badge active';
             document.getElementById('status-funvisis').innerHTML = 'FUNVISIS ✅';
+
             return data.map(q => {
                 const fechaStr = q.fecha + 'T' + q.hora;
                 const tiempo_ms = new Date(fechaStr).getTime();
-                return { fuente: 'FUNVISIS', magnitud: parseFloat(q.magnitud), ubicacion: q.epicentro || 'Sismo en Venezuela', fecha_hora: new Date(fechaStr), tiempo_ms: tiempo_ms };
+                return { 
+                    fuente: 'FUNVISIS', 
+                    magnitud: parseFloat(q.magnitud), 
+                    ubicacion: q.epicentro || 'Sismo en Venezuela', 
+                    fecha_hora: new Date(fechaStr), 
+                    tiempo_ms: tiempo_ms 
+                };
             });
         } catch (e) {
             document.getElementById('status-funvisis').className = 'status-badge error';
-            document.getElementById('status-funvisis').innerHTML = 'FUNVISIS ⚠️';
+            document.getElementById('status-funvisis').innerHTML = 'FUNVISIS ❌';
             return [];
         }
     }
