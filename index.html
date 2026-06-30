@@ -120,41 +120,37 @@
             document.getElementById('status-usgs').innerHTML = 'USGS ❌';
             return [];
         }
-    }
 
-    async function fetchFunvisis() {
-        try {
-            // Usamos un proxy para saltar la restricción de seguridad del navegador
-            const proxyUrl = 'https://corsproxy.io/?';
-            const targetUrl = 'https://sismosve.rafnixg.dev/api/v1/sismos';
-            
-            const response = await fetch(proxyUrl + encodeURIComponent(targetUrl));
-            
-            if (!response.ok) throw new Error('Error en conexión');
-            
-            const data = await response.json();
-            
-            document.getElementById('status-funvisis').className = 'status-badge active';
-            document.getElementById('status-funvisis').innerHTML = 'FUNVISIS ✅';
+        async function chequearSismos() {
+        if (!monitoreoActivo) return;
 
-            return data.map(q => {
-                const fechaStr = q.fecha + 'T' + q.hora;
-                const tiempo_ms = new Date(fechaStr).getTime();
-                return { 
-                    fuente: 'FUNVISIS', 
-                    magnitud: parseFloat(q.magnitud), 
-                    ubicacion: q.epicentro || 'Sismo en Venezuela', 
-                    fecha_hora: new Date(fechaStr), 
-                    tiempo_ms: tiempo_ms 
-                };
-            });
-        } catch (e) {
-            document.getElementById('status-funvisis').className = 'status-badge error';
-            document.getElementById('status-funvisis').innerHTML = 'FUNVISIS ❌';
-            return [];
+        const list = document.getElementById('sismos-list');
+        
+        // Ejecutamos ambas, pero no dejamos que el fallo de una dañe la experiencia
+        const [usgsData, funvisisData] = await Promise.all([
+            fetchUSGS(), 
+            fetchFunvisis().catch(() => []) // Si FUNVISIS falla, devuelve una lista vacía en silencio
+        ]);
+        
+        let todosLosSismos = [...usgsData, ...funvisisData];
+        
+        if (todosLosSismos.length === 0) {
+            list.innerHTML = `<p style="text-align:center; color: #aaa;">Monitoreando... (Sin sismos recientes)</p>`;
+            return;
         }
-    }
 
+        todosLosSismos.sort((a, b) => b.tiempo_ms - a.tiempo_ms);
+        const masReciente = todosLosSismos[0];
+
+        // Lógica de alarma igual que antes...
+        if (ultimoSismoTime === 0) {
+            ultimoSismoTime = masReciente.tiempo_ms;
+        } else if (masReciente.tiempo_ms > ultimoSismoTime) {
+            ultimoSismoTime = masReciente.tiempo_ms;
+            hacerSonarAlarma();
+            activarAlarmaVisual();
+        }
+        
     async function chequearSismos() {
         if (!monitoreoActivo) return;
         const list = document.getElementById('sismos-list');
