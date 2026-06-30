@@ -7,6 +7,7 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #ffffff; margin: 0; padding: 20px; transition: background-color 0.5s; }
         h1 { text-align: center; color: #ff6b6b; font-size: 1.8em; }
+        .autor { text-align: center; color: #888; margin-bottom: 20px; font-size: 0.9em; }
         
         /* Panel y botones */
         .status-bar { text-align: center; background: #2b2b36; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444; }
@@ -47,12 +48,18 @@
             50% { background-color: #8b0000; }
             100% { background-color: #1e1e24; }
         }
+
+        /* Acordeón Instalación */
+        .acordeon { background: #32323e; margin-top: 20px; border-radius: 8px; overflow: hidden; }
+        .cabecera { padding: 15px; cursor: pointer; font-weight: bold; border-bottom: 1px solid #444; }
+        .contenido { padding: 15px; display: none; font-size: 0.9em; color: #ccc; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🚨 Monitor de Alerta Temprana</h1>
+    <div class="autor">Desarrollado por Carlos Zinzi</div>
     
     <button id="btn-activar" class="btn-activar" onclick="activarSistema()">TOCA AQUÍ PARA ACTIVAR ALARMA Y MONITOREO</button>
 
@@ -65,6 +72,15 @@
     <div id="sismos-list">
         <p style="text-align:center; color: #aaa; font-size: 1.2em;">El sistema está en pausa. Activa el botón rojo de arriba.</p>
     </div>
+
+    <div class="acordeon">
+        <div class="cabecera" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">🍎 Instalación iPhone (Safari)</div>
+        <div class="contenido">Toca "Compartir" (flecha) -> "Añadir a pantalla de inicio".</div>
+    </div>
+    <div class="acordeon">
+        <div class="cabecera" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">🤖 Instalación Android (Chrome)</div>
+        <div class="contenido">Toca los tres puntos (⋮) -> "Instalar aplicación".</div>
+    </div>
 </div>
 
 <script>
@@ -72,7 +88,6 @@
     let monitoreoActivo = false;
     let audioCtx;
 
-    // Crear un pitido fuerte usando matemáticas de audio puro
     function hacerSonarAlarma() {
         if (!audioCtx) return;
         const osc = audioCtx.createOscillator();
@@ -80,18 +95,16 @@
         osc.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         osc.type = 'square';
-        osc.frequency.setValueAtTime(800, audioCtx.currentTime); // Tono agudo
-        osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.5); // Tono más agudo
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.5);
         gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-        
         osc.start();
-        osc.stop(audioCtx.currentTime + 2); // Suena por 2 segundos
+        osc.stop(audioCtx.currentTime + 2);
     }
 
-    // Activar visualmente la pantalla roja
     function activarAlarmaVisual() {
         document.body.classList.add('alerta-roja');
-        setTimeout(() => { document.body.classList.remove('alerta-roja'); }, 10000); // Se apaga a los 10 seg
+        setTimeout(() => { document.body.classList.remove('alerta-roja'); }, 10000);
     }
 
     async function fetchUSGS() {
@@ -100,7 +113,6 @@
             const data = await response.json();
             document.getElementById('status-usgs').className = 'status-badge active';
             document.getElementById('status-usgs').innerHTML = 'USGS ✅';
-            
             const sismosVenezuela = data.features.filter(q => q.properties.place && q.properties.place.toLowerCase().includes('venezuela'));
             return sismosVenezuela.map(q => ({ fuente: 'USGS', magnitud: q.properties.mag, ubicacion: q.properties.place, fecha_hora: new Date(q.properties.time), tiempo_ms: q.properties.time }));
         } catch (e) {
@@ -116,7 +128,6 @@
             const data = await response.json();
             document.getElementById('status-funvisis').className = 'status-badge active';
             document.getElementById('status-funvisis').innerHTML = 'FUNVISIS ✅';
-
             return data.map(q => {
                 const fechaStr = q.fecha + 'T' + q.hora;
                 const tiempo_ms = new Date(fechaStr).getTime();
@@ -131,32 +142,23 @@
 
     async function chequearSismos() {
         if (!monitoreoActivo) return;
-
         const list = document.getElementById('sismos-list');
         const [usgsData, funvisisData] = await Promise.all([fetchUSGS(), fetchFunvisis()]);
-        
         let todosLosSismos = [...usgsData, ...funvisisData];
         if (todosLosSismos.length === 0) return;
-
         todosLosSismos.sort((a, b) => b.tiempo_ms - a.tiempo_ms);
         const masReciente = todosLosSismos[0];
-
-        // LÓGICA DE ALARMA: Si es la primera vez que carga, guarda el tiempo. Si ya cargó y detecta uno nuevo, suena.
         if (ultimoSismoTime === 0) {
-            ultimoSismoTime = masReciente.tiempo_ms; // Guarda la referencia inicial
+            ultimoSismoTime = masReciente.tiempo_ms;
         } else if (masReciente.tiempo_ms > ultimoSismoTime) {
-            // ¡NUEVO SISMO DETECTADO!
             ultimoSismoTime = masReciente.tiempo_ms;
             hacerSonarAlarma();
             activarAlarmaVisual();
         }
-        
-        // Imprimir en pantalla
         let colorClass = 'low';
         if (masReciente.magnitud >= 4.0) colorClass = 'med';
         if (masReciente.magnitud >= 6.0) colorClass = 'high';
         let sourceClass = masReciente.fuente === 'USGS' ? 'usgs' : 'funvisis';
-
         list.innerHTML = `
             <div class="sismo-destacado">
                 <div style="color: #ffeb3b; font-weight: bold;">Último Registro Automático</div>
@@ -170,22 +172,14 @@
         `;
     }
 
-    // Función que arranca todo cuando el usuario presiona el botón
     function activarSistema() {
         const btn = document.getElementById('btn-activar');
-        
         if (!monitoreoActivo) {
-            // Desbloquear audio en el navegador
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
             monitoreoActivo = true;
             btn.innerHTML = "✅ MONITOREO Y ALARMA ACTIVOS";
             btn.classList.add('on');
-            
-            // Ejecutar la primera vez de inmediato
             chequearSismos();
-            
-            // Programar el sistema para que busque nuevos datos cada 60 segundos (60000 milisegundos)
             setInterval(chequearSismos, 60000);
         }
     }
