@@ -8,18 +8,19 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #ffffff; margin: 0; padding: 20px; transition: background-color 0.5s; }
         h1 { text-align: center; color: #ff6b6b; font-size: 1.6em; }
         .autor { text-align: center; font-size: 0.9em; color: #888; margin-bottom: 20px; }
-        
         .container { max-width: 800px; margin: auto; background: #2a2a35; padding: 20px; border-radius: 12px; }
-        .btn-activar { background-color: #f44336; border: none; color: white; padding: 15px; width: 100%; font-size: 16px; cursor: pointer; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
+        .btn-activar { background-color: #f44336; border: none; color: white; padding: 15px; width: 100%; font-size: 16px; cursor: pointer; border-radius: 8px; font-weight: bold; margin-bottom: 10px; }
         .btn-activar.on { background-color: #4caf50; }
+        .btn-json { background-color: #2196f3; border: none; color: white; padding: 10px; width: 100%; font-size: 14px; cursor: pointer; border-radius: 8px; margin-bottom: 20px; }
         
-        .sismo-destacado { background: #3b3b4a; padding: 15px; border-radius: 10px; text-align: center; margin-top: 15px; border: 2px solid #555; }
-        .mag { font-size: 2em; font-weight: bold; margin: 10px; }
+        .sismo-destacado { background: #3b3b4a; padding: 20px; border-radius: 10px; text-align: center; margin-top: 15px; border: 2px solid #555; }
+        .mag { font-size: 3em; font-weight: bold; margin: 10px; color: #00e676; }
         
         .acordeon { background: #32323e; margin-bottom: 10px; border-radius: 8px; overflow: hidden; }
         .cabecera { padding: 15px; cursor: pointer; display: flex; align-items: center; font-weight: bold; border-bottom: 1px solid #444; }
         .contenido { padding: 15px; display: none; font-size: 0.9em; color: #ccc; }
         .icono { margin-right: 10px; }
+        
         .alerta-roja { animation: flashRed 1s infinite; }
         @keyframes flashRed { 50% { background-color: #8b0000; } }
     </style>
@@ -31,19 +32,20 @@
     <div class="autor">Desarrollado por Carlos Zinzi para nuestra comunidad.</div>
     
     <button id="btn-activar" class="btn-activar" onclick="activarSistema()">TOCA AQUÍ PARA ACTIVAR ALARMA Y MONITOREO</button>
+    <button id="btn-json" class="btn-json" style="display:none;" onclick="descargarJSON()">⬇️ Descargar Historial Completo (.JSON)</button>
 
     <div id="sismos-list">
-        <p style="text-align:center;">Presiona el botón rojo para iniciar.</p>
+        <p style="text-align:center;">Presiona el botón rojo para comenzar a escanear.</p>
     </div>
 
     <h3 style="margin-top: 30px;">📱 ¿Cómo instalar esta App?</h3>
     <div class="acordeon">
         <div class="cabecera" onclick="toggle(this)"><span class="icono">🍎</span> iPhone (Safari)</div>
-        <div class="contenido">1. Toca "Compartir" (cuadrado con flecha).<br>2. Toca "Añadir a pantalla de inicio".<br>3. Dale a "Añadir".</div>
+        <div class="contenido">1. Toca "Compartir" (cuadrado con flecha).<br>2. Toca "Añadir a la pantalla de inicio".<br>3. Dale a "Añadir".</div>
     </div>
     <div class="acordeon">
         <div class="cabecera" onclick="toggle(this)"><span class="icono">🤖</span> Android (Chrome)</div>
-        <div class="contenido">1. Toca los tres puntitos.<br>2. Selecciona "Instalar aplicación" o "Añadir a inicio".<br>3. Confirma en "Instalar".</div>
+        <div class="contenido">1. Toca los tres puntos.<br>2. Selecciona "Instalar aplicación" o "Añadir a inicio".<br>3. Confirma en "Instalar".</div>
     </div>
 </div>
 
@@ -51,6 +53,7 @@
     let ultimoSismoTime = 0;
     let monitoreoActivo = false;
     let audioCtx;
+    let datosHistoricos = [];
 
     function toggle(el) { el.nextElementSibling.style.display = el.nextElementSibling.style.display === 'block' ? 'none' : 'block'; }
 
@@ -64,17 +67,21 @@
             const uData = await uRes.json();
             const fData = await fRes.json();
 
-            let sismos = [
-                ...uData.features.filter(q => q.properties.place.toLowerCase().includes('venezuela')).map(q => ({ 
-                    mag: q.properties.mag, loc: q.properties.place, time: q.properties.time 
-                })),
-                ...fData.map(q => ({ 
-                    mag: parseFloat(q.magnitud), loc: q.epicentro, time: new Date(q.fecha + 'T' + q.hora).getTime() 
-                }))
-            ];
+            let sismosUSGS = uData.features
+                .filter(q => q.properties.place && q.properties.place.toLowerCase().includes('venezuela'))
+                .map(q => ({ mag: q.properties.mag, loc: q.properties.place, time: q.properties.time, fuente: 'USGS' }));
 
-            sismos.sort((a, b) => b.time - a.time);
-            const reciente = sismos[0];
+            let sismosFUNVISIS = fData.map(q => ({ 
+                mag: parseFloat(q.magnitud), 
+                loc: q.epicentro || "Sismo en Venezuela", 
+                time: new Date(q.fecha + 'T' + q.hora).getTime(),
+                fuente: 'FUNVISIS' 
+            }));
+
+            datosHistoricos = [...sismosUSGS, ...sismosFUNVISIS];
+            datosHistoricos.sort((a, b) => b.time - a.time);
+            
+            const reciente = datosHistoricos[0];
 
             if (ultimoSismoTime !== 0 && reciente.time > ultimoSismoTime) {
                 document.body.classList.add('alerta-roja');
@@ -89,10 +96,23 @@
 
             document.getElementById('sismos-list').innerHTML = `
                 <div class="sismo-destacado">
+                    <div style="font-size: 0.9em; color: #aaa;">Último evento detectado:</div>
                     <div class="mag">${reciente.mag.toFixed(1)}</div>
-                    <strong>${reciente.loc}</strong><br><small>${new Date(reciente.time).toLocaleString()}</small>
+                    <strong>${reciente.loc}</strong><br>
+                    <small>Fuente: ${reciente.fuente} | ${new Date(reciente.time).toLocaleString()}</small>
                 </div>`;
+            document.getElementById('btn-json').style.display = 'block';
         } catch(e) { console.error(e); }
+    }
+
+    function descargarJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(datosHistoricos, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "historial_sismos_venezuela.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
     }
 
     function activarSistema() {
