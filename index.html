@@ -12,15 +12,12 @@
         .btn-activar { background-color: #f44336; border: none; color: white; padding: 15px; width: 100%; font-size: 16px; cursor: pointer; border-radius: 8px; font-weight: bold; margin-bottom: 10px; }
         .btn-activar.on { background-color: #4caf50; }
         .btn-json { background-color: #2196f3; border: none; color: white; padding: 10px; width: 100%; font-size: 14px; cursor: pointer; border-radius: 8px; margin-bottom: 20px; }
-        
         .sismo-destacado { background: #3b3b4a; padding: 20px; border-radius: 10px; text-align: center; margin-top: 15px; border: 2px solid #555; }
         .mag { font-size: 3em; font-weight: bold; margin: 10px; color: #00e676; }
-        
         .acordeon { background: #32323e; margin-bottom: 10px; border-radius: 8px; overflow: hidden; }
         .cabecera { padding: 15px; cursor: pointer; display: flex; align-items: center; font-weight: bold; border-bottom: 1px solid #444; }
         .contenido { padding: 15px; display: none; font-size: 0.9em; color: #ccc; }
         .icono { margin-right: 10px; }
-        
         .alerta-roja { animation: flashRed 1s infinite; }
         @keyframes flashRed { 50% { background-color: #8b0000; } }
     </style>
@@ -31,14 +28,14 @@
     <h1>🚨 Monitor de Alerta Temprana</h1>
     <div class="autor">Desarrollado por Carlos Zinzi para nuestra comunidad.</div>
     
-    <button id="btn-activar" class="btn-activar" onclick="activarSistema()">TOCA AQUÍ PARA ACTIVAR ALARMA Y MONITOREO</button>
+    <button id="btn-activar" class="btn-activar" onclick="activarSistema()">TOCA AQUÍ PARA ACTIVAR / REFRESCAR</button>
     <button id="btn-json" class="btn-json" style="display:none;" onclick="descargarJSON()">⬇️ Descargar Historial Completo (.JSON)</button>
 
     <div id="sismos-list">
-        <p style="text-align:center;">Presiona el botón verde para cargar el historial de sismos.</p>
+        <p style="text-align:center;">Presiona el botón verde para forzar la carga de datos.</p>
     </div>
 
-    <h3 style="margin-top: 30px;">📱 ¿Cómo instalar esta App?</h3>
+    <h3>📱 ¿Cómo instalar esta App?</h3>
     <div class="acordeon">
         <div class="cabecera" onclick="toggle(this)"><span class="icono">🍎</span> iPhone (Safari)</div>
         <div class="contenido">1. Toca "Compartir" (cuadrado con flecha).<br>2. Toca "Añadir a la pantalla de inicio".<br>3. Dale a "Añadir".</div>
@@ -58,10 +55,12 @@
     function toggle(el) { el.nextElementSibling.style.display = el.nextElementSibling.style.display === 'block' ? 'none' : 'block'; }
 
     async function chequearSismos() {
+        // Añadimos '?t=' + Date.now() para que los servidores crean que es una petición nueva
+        const timeStamp = Date.now();
         try {
             const [uRes, fRes] = await Promise.all([
-                fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson'),
-                fetch('https://sismosve.rafnixg.dev/api/v1/sismos')
+                fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson?t=' + timeStamp),
+                fetch('https://sismosve.rafnixg.dev/api/v1/sismos?t=' + timeStamp)
             ]);
             const uData = await uRes.json();
             const fData = await fRes.json();
@@ -82,7 +81,6 @@
             
             const reciente = datosHistoricos[0];
 
-            // Si es un evento nuevo comparado al que ya teníamos registrado, alerta
             if (monitoreoActivo && ultimoSismoTime !== 0 && reciente.time > ultimoSismoTime) {
                 document.body.classList.add('alerta-roja');
                 setTimeout(() => document.body.classList.remove('alerta-roja'), 5000);
@@ -114,14 +112,12 @@
     }
 
     function activarSistema() {
-        if (!monitoreoActivo) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            monitoreoActivo = true;
-            document.getElementById('btn-activar').innerHTML = "✅ MONITOREO ACTIVO";
-            document.getElementById('btn-activar').classList.add('on');
-        }
-        chequearSismos(); // Carga inmediata
-        setInterval(chequearSismos, 60000); // Luego cada minuto
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        monitoreoActivo = true;
+        document.getElementById('btn-activar').innerHTML = "✅ MONITOREO ACTIVO (ACTUALIZANDO)";
+        document.getElementById('btn-activar').classList.add('on');
+        chequearSismos();
+        setInterval(chequearSismos, 60000);
     }
 </script>
 </body>
